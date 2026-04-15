@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Viaggio Nozze">
+  <title>Viaggio Nozze</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: rgba(255,255,255,0.88);
+      --surface-strong: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --success: #0f766e;
+      --border: rgba(15,23,42,0.08);
+      --shadow: 0 10px 35px rgba(15,23,42,0.12);
+      --radius: 18px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+    body { min-height: 100vh; }
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    .topbar {
+      position: sticky; top: 0; z-index: 1000;
+      padding: calc(env(safe-area-inset-top) + 10px) var(--space-4) 12px;
+      background: rgba(244,246,248,0.84);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .title { font-size: 22px; font-weight: 700; margin: 0; }
+    .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .status-pill {
+      margin-top: 10px; display: inline-flex; gap: 8px; align-items: center;
+      padding: 8px 12px; border-radius: 999px; background: white; border: 1px solid var(--border);
+      font-size: 13px; color: var(--muted);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: #f59e0b; }
+    .dot.ok { background: #10b981; }
+    .content { padding: 12px 12px calc(env(safe-area-inset-bottom) + 90px); display: grid; gap: 12px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+    #map { height: 38vh; min-height: 300px; width: 100%; }
+    .card-body { padding: 14px; }
+    .section-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .current-title { font-size: 20px; font-weight: 700; line-height: 1.2; margin: 0 0 8px; }
+    .time-row { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+    .action-box {
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+      border: 1px solid rgba(37,99,235,0.12);
+      border-radius: 14px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .action-title { font-weight: 700; margin: 0 0 6px; font-size: 15px; }
+    .action-text { margin: 0; font-size: 14px; color: #1e293b; line-height: 1.45; }
+    .distance { margin-top: 10px; font-size: 13px; color: var(--success); font-weight: 600; }
+    .list { display: grid; gap: 10px; }
+    .item {
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+    }
+    .item-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+    .item-meta { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+    .item-desc { font-size: 13px; color: #334155; margin: 0; line-height: 1.4; }
+    .bottom-nav {
+      position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 10px);
+      z-index: 1100; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      background: rgba(15,23,42,0.92); border-radius: 20px; padding: 10px; box-shadow: 0 16px 36px rgba(15,23,42,0.28);
+    }
+    .nav-btn {
+      border: 0; background: transparent; color: white; padding: 10px 8px; border-radius: 14px; font-size: 13px; font-weight: 600;
+    }
+    .nav-btn.active { background: rgba(255,255,255,0.12); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .leaflet-popup-content { font-size: 14px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1 class="title">Viaggio di nozze</h1>
+    <p class="subtitle">Assistente live per iPhone: dove sei, cosa devi fare, cosa viene dopo.</p>
+    <div class="status-pill"><span id="geoDot" class="dot"></span><span id="geoStatus">Geolocalizzazione in attesa</span></div>
+  </header>
+
+  <main class="content">
+    <section class="card">
+      <div id="map"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-body" id="currentCard">
+        <div class="section-label">Adesso</div>
+        <h2 class="current-title">Caricamento itinerario…</h2>
+        <div class="time-row">Sto preparando la giornata corrente.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-body">
+        <div class="section-label">Prossimi passaggi</div>
+        <div class="list" id="nextList"></div>
+        <div class="hint">Suggerimento: da Safari su iPhone usa “Condividi → Aggiungi a Home” per averla come app.</div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-target="0">Mappa</button>
+    <button class="nav-btn" data-target="1">Adesso</button>
+    <button class="nav-btn" data-target="2">Dopo</button>
+  </nav>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const itinerary = {
+  tripName: 'USA + Messico 2026',
+  events: [
+    { id:'day1', title:'Arrivo a San Francisco e check-in Axiom Hotel', description:'Arrivo, BART fino a Powell Street, check-in e cena leggera vicino all’hotel.', start:'2026-07-23T19:25:00-07:00', end:'2026-07-23T22:30:00-07:00', lat:37.7849, lng:-122.40817, locationName:'Axiom Hotel, San Francisco', action:'Vai in hotel, fai check-in e fai una cena tranquilla da primo arrivo.' },
+    { id:'day2', title:'San Francisco centro e waterfront', description:'Colazione in diner, cable car, Fisherman’s Wharf, Pier 39, eventuale Alcatraz, Chinatown e North Beach.', start:'2026-07-24T08:00:00-07:00', end:'2026-07-24T22:30:00-07:00', lat:37.8080, lng:-122.4177, locationName:'Fisherman’s Wharf, San Francisco', action:'Muoviti verso il waterfront e segui il blocco visite della giornata.' },
+    { id:'day3', title:'San Francisco panoramica', description:'Golden Gate Bridge, Palace of Fine Arts, parchi e punti panoramici.', start:'2026-07-25T08:00:00-07:00', end:'2026-07-25T22:30:00-07:00', lat:37.8199, lng:-122.4783, locationName:'Golden Gate Bridge, San Francisco', action:'Punta alle viste panoramiche e organizza la giornata intorno ai viewpoint.' },
+    { id:'day4', title:'San Francisco → Yosemite → Oakhurst', description:'Ritiro auto, trasferimento verso Yosemite, visite in valle e arrivo a Oakhurst.', start:'2026-07-26T07:00:00-07:00', end:'2026-07-26T21:00:00-07:00', lat:37.7456, lng:-119.5936, locationName:'Yosemite Valley', action:'Recupera l’auto, entra nel parco e segui le soste panoramiche principali.' },
+    { id:'day5', title:'Oakhurst → Sequoie → Death Valley', description:'Mariposa Grove, lungo trasferimento e check-in a Death Valley.', start:'2026-07-27T06:30:00-07:00', end:'2026-07-27T21:00:00-07:00', lat:36.4569, lng:-116.8657, locationName:'The Ranch at Death Valley', action:'Fai carburante e acqua, poi affronta la tappa lunga verso Death Valley.' },
+    { id:'day6', title:'Death Valley → Las Vegas', description:'Alba a Zabriskie Point, dune, trasferimento a Las Vegas e visita della Strip.', start:'2026-07-28T05:45:00-07:00', end:'2026-07-28T23:30:00-07:00', lat:36.1147, lng:-115.1728, locationName:'Las Vegas Strip', action:'Chiudi le ultime viste nel parco e poi spostati verso la Strip.' },
+    { id:'day7', title:'Las Vegas → Coral Pink Sand Dunes → Kanab', description:'Trasferimento, visita dunes e arrivo a Kanab.', start:'2026-07-29T07:00:00-07:00', end:'2026-07-29T21:00:00-07:00', lat:37.0470, lng:-112.5263, locationName:'Kanab, Utah', action:'Raggiungi Coral Pink Sand Dunes e poi prosegui verso Kanab.' },
+    { id:'day8', title:'Kanab → Bryce Canyon → Page', description:'Bryce Canyon, transfer a Page e Horseshoe Bend al tramonto.', start:'2026-07-30T06:30:00-07:00', end:'2026-07-30T21:30:00-07:00', lat:36.8790, lng:-111.5103, locationName:'Horseshoe Bend / Page', action:'Visita Bryce e arriva a Page in tempo per il tramonto.' },
+    { id:'day9', title:'Page → Antelope Canyon → Monument Valley → Kayenta', description:'Tour Antelope, horseback tour in Monument Valley e arrivo a Kayenta.', start:'2026-07-31T07:00:00-07:00', end:'2026-07-31T21:00:00-07:00', lat:36.9911, lng:-110.0985, locationName:'Monument Valley', action:'Dai priorità ad Antelope e al tour a cavallo già previsto.' },
+    { id:'day10', title:'Kayenta → Grand Canyon South Rim → Williams', description:'Viewpoint principali del Grand Canyon e arrivo a Williams.', start:'2026-08-01T06:30:00-07:00', end:'2026-08-01T21:00:00-07:00', lat:36.0544, lng:-112.1401, locationName:'Grand Canyon South Rim', action:'Segui la sequenza dei viewpoint principali e chiudi la giornata a Williams.' },
+    { id:'day11', title:'Williams → Zion → Laughlin', description:'Giornata intensa con highlights a Zion e trasferimento finale a Laughlin.', start:'2026-08-02T06:30:00-07:00', end:'2026-08-02T21:30:00-07:00', lat:37.2982, lng:-113.0263, locationName:'Zion National Park', action:'Fai una visita highlights a Zion e riparti con margine verso Laughlin.' },
+    { id:'day12', title:'Laughlin → Los Angeles', description:'Trasferimento verso Los Angeles, Hollywood e possibile Griffith Observatory.', start:'2026-08-03T07:30:00-07:00', end:'2026-08-03T22:30:00-07:00', lat:34.1341, lng:-118.3215, locationName:'Hollywood / Griffith area', action:'Arriva a Los Angeles, fai check-in e concentrati sulle prime visite classiche.' },
+    { id:'day13', title:'Los Angeles classica', description:'Griffith, Beverly Hills, The Grove e Santa Monica.', start:'2026-08-04T08:00:00-07:00', end:'2026-08-04T23:00:00-07:00', lat:34.0195, lng:-118.4912, locationName:'Santa Monica Pier', action:'Distribuisci bene i tempi per chiudere con Santa Monica nel tardo pomeriggio.' },
+    { id:'day14', title:'Venice, Abbot Kinney e costa', description:'Venice Beach, Abbot Kinney, Malibu o Getty Center.', start:'2026-08-05T08:00:00-07:00', end:'2026-08-05T23:00:00-07:00', lat:33.9850, lng:-118.4695, locationName:'Venice Beach', action:'Tieni la giornata più rilassata e chiudi con la cena finale negli USA.' },
+    { id:'day15', title:'Los Angeles → Cancun → Playa del Carmen', description:'Aeroporto, volo, trasferimento e check-in al resort.', start:'2026-08-06T07:00:00-07:00', end:'2026-08-06T23:59:00-05:00', lat:20.5960, lng:-87.0890, locationName:'Sandos Playacar, Playa del Carmen', action:'Giornata logistica: riconsegna auto, volo e arrivo tranquillo in resort.' },
+    { id:'day16-20', title:'Relax e escursioni a Playa del Carmen', description:'Relax in resort con possibili uscite a Cozumel, Tulum e cenote.', start:'2026-08-07T08:00:00-05:00', end:'2026-08-11T23:00:00-05:00', lat:20.6296, lng:-87.0739, locationName:'Playa del Carmen', action:'Goditi la parte relax e scegli escursioni solo se avete voglia di muovervi.' },
+    { id:'day21', title:'Rientro: Playa del Carmen → Cancun → Washington → Roma', description:'Mattina libera, aeroporto e voli di rientro.', start:'2026-08-12T08:00:00-05:00', end:'2026-08-13T14:00:00+02:00', lat:41.8003, lng:12.2389, locationName:'Fiumicino', action:'Gestisci con calma il checkout e punta all’aeroporto con anticipo.' }
+  ]
+};
+
+let map, userMarker;
+const markers = [];
+const sections = document.querySelectorAll('.card');
+const buttons = document.querySelectorAll('.nav-btn');
+
+buttons.forEach(btn => btn.addEventListener('click', () => {
+  buttons.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  sections[Number(btn.dataset.target)].scrollIntoView({ behavior:'smooth', block:'start' });
+}));
+
+function initMap() {
+  map = L.map('map', { zoomControl: false }).setView([37.7849, -122.40817], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  itinerary.events.forEach(ev => {
+    const marker = L.marker([ev.lat, ev.lng]).addTo(map);
+    marker.bindPopup(`<strong>${ev.title}</strong><br>${ev.locationName}<br><small>${formatRange(ev)}</small><br><br>${ev.action}`);
+    markers.push({ ev, marker });
+  });
+}
+
+function formatRange(ev) {
+  const s = new Date(ev.start);
+  const e = new Date(ev.end);
+  return `${s.toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'short' })} · ${s.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}-${e.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}`;
+}
+
+function getCurrentAndUpcoming() {
+  const now = new Date();
+  const sorted = [...itinerary.events].sort((a,b) => new Date(a.start) - new Date(b.start));
+  let current = null;
+  const upcoming = [];
+  for (const ev of sorted) {
+    const s = new Date(ev.start);
+    const e = new Date(ev.end);
+    if (now >= s && now <= e) current = ev;
+    if (now < s) upcoming.push(ev);
+  }
+  if (!current) {
+    current = sorted.find(ev => now < new Date(ev.start)) || sorted[sorted.length - 1];
+  }
+  return { current, upcoming };
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function render(userCoords = null) {
+  const { current, upcoming } = getCurrentAndUpcoming();
+  const currentCard = document.getElementById('currentCard');
+  let distanceHtml = '';
+  if (userCoords && current?.lat && current?.lng) {
+    const km = haversine(userCoords.lat, userCoords.lng, current.lat, current.lng).toFixed(1);
+    distanceHtml = `<div class="distance">Sei a circa ${km} km dalla tappa di riferimento.</div>`;
+  }
+  currentCard.innerHTML = `
+    <div class="section-label">Adesso</div>
+    <h2 class="current-title">${current.title}</h2>
+    <div class="time-row">${formatRange(current)} · ${current.locationName}</div>
+    <p>${current.description}</p>
+    <div class="action-box">
+      <p class="action-title">Cosa devi fare</p>
+      <p class="action-text">${current.action}</p>
+    </div>
+    ${distanceHtml}
+  `;
+
+  const nextList = document.getElementById('nextList');
+  nextList.innerHTML = upcoming.slice(0,5).map(ev => `
+    <article class="item">
+      <h3 class="item-title">${ev.title}</h3>
+      <p class="item-meta">${formatRange(ev)} · ${ev.locationName}</p>
+      <p class="item-desc">${ev.action}</p>
+    </article>
+  `).join('') || '<article class="item"><p class="item-title">Nessun altro step futuro</p><p class="item-desc">Sei nella parte finale dell’itinerario.</p></article>';
+
+  if (current?.lat && current?.lng) {
+    map.flyTo([current.lat, current.lng], 8, { duration: 1.2 });
+    const active = markers.find(m => m.ev.id === current.id);
+    if (active) active.marker.openPopup();
+  }
+}
+
+function setupGeolocation() {
+  const geoStatus = document.getElementById('geoStatus');
+  const geoDot = document.getElementById('geoDot');
+  if (!navigator.geolocation) {
+    geoStatus.textContent = 'Geolocalizzazione non supportata';
+    render();
+    return;
+  }
+  navigator.geolocation.watchPosition(pos => {
+    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    geoStatus.textContent = 'Posizione attiva';
+    geoDot.classList.add('ok');
+    if (!userMarker) {
+      userMarker = L.circleMarker([coords.lat, coords.lng], {
+        radius: 10, color: '#2563eb', weight: 3, fillColor: '#60a5fa', fillOpacity: .95
+      }).addTo(map);
+    } else {
+      userMarker.setLatLng([coords.lat, coords.lng]);
+    }
+    render(coords);
+  }, err => {
+    geoStatus.textContent = 'Posizione non disponibile';
+    geoDot.classList.remove('ok');
+    render();
+  }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
+}
+
+initMap();
+render();
+setupGeolocation();
+</script>
+</body>
+</html>

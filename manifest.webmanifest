@@ -1,24 +1,25 @@
 {
   "name": "Viaggio di Nozze",
-  "short_name": "Viaggio",
-  "start_url": "./honeymoon-planner.html",
+  "short_name": "Viaggio",n
+  "start_url": "/honeymoon-planner/",
+  "scope": "/honeymoon-planner/",
   "display": "standalone",
   "background_color": "#f4f6f8",
   "theme_color": "#0f172a",
   "lang": "it",
   "icons": [
     {
-      "src": "./assets/icon-192.png",
+      "src": "/honeymoon-planner/assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "./assets/icon-512.png",
+      "src": "/honeymoon-planner/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "./assets/icon-180.png",
+      "src": "/honeymoon-planner/assets/icon-180.png",
       "sizes": "180x180",
       "type": "image/png"
     }
